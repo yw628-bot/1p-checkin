@@ -1,0 +1,29 @@
+name: Daily Checkin
+
+on:
+  schedule:
+    - cron: '0 13 * * *'  # 每天美东 9 点
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+          npx playwright install
+
+      - name: Run Checkin
+        run: node checkin.js
+        env:
+          COOKIES: ${{ secrets.COOKIES }}

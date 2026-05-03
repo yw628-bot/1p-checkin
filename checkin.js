@@ -4,7 +4,19 @@ const { chromium } = require('playwright');
   const browser = await chromium.launch();
   const context = await browser.newContext();
 
-  const cookies = JSON.parse(process.env.COOKIES);
+  const rawCookies = JSON.parse(process.env.COOKIES);
+
+  // 修复 sameSite 字段
+  const cookies = rawCookies.map(c => {
+    if (c.sameSite) {
+      const val = c.sameSite.toLowerCase();
+      if (val === 'lax') c.sameSite = 'Lax';
+      else if (val === 'strict') c.sameSite = 'Strict';
+      else if (val === 'none') c.sameSite = 'None';
+      else delete c.sameSite;
+    }
+    return c;
+  });
   await context.addCookies(cookies);
 
   const page = await context.newPage();

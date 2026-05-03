@@ -28,8 +28,10 @@ function logStep(step, data) {
   });
 
   const context = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    locale: "en-US",
     userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
   });
 
   await context.addCookies(normalizeCookies(process.env.COOKIES || ""));
@@ -38,7 +40,21 @@ function logStep(step, data) {
 
   try {
     // =========================
-    // 1️⃣ LANDING
+    // STEP 1 - ENTRY NAVIGATION
+    // =========================
+    await page.goto("https://www.1point3acres.com/bbs/", {
+      waitUntil: "domcontentloaded",
+    });
+
+    await page.waitForTimeout(4000);
+
+    logStep("STEP1_URL", page.url());
+    logStep("STEP1_TITLE", await page.title());
+
+    await page.screenshot({ path: "step1_entry.png", fullPage: true });
+
+    // =========================
+    // STEP 2 - CHECKIN PAGE NAVIGATION
     // =========================
     await page.goto(
       "https://www.1point3acres.com/next/daily-checkin",
@@ -47,73 +63,88 @@ function logStep(step, data) {
 
     await page.waitForTimeout(5000);
 
-    logStep("STEP1_URL", page.url());
-    logStep("STEP1_TITLE", await page.title());
+    logStep("STEP2_URL", page.url());
+    logStep("STEP2_TITLE", await page.title());
 
-    await page.screenshot({ path: "step1_landing.png", fullPage: true });
+    await page.screenshot({ path: "step2_checkin.png", fullPage: true });
 
     // =========================
-    // 2️⃣ PAGE READY CHECK
+    // STEP 3 - CLOUDFLARE / BLOCK CHECK
     // =========================
-    const btnCount = await page.getByText("签到").count();
-    const altBtnCount = await page.getByText("立即签到").count();
+    const title = await page.title();
 
-    logStep("STEP2_BUTTON_CHECK", {
-      "签到按钮": btnCount,
-      "立即签到按钮": altBtnCount,
+    const isBlocked =
+      title.includes("Just a moment") ||
+      title.includes("Checking your browser");
+
+    logStep("STEP3_BLOCK_CHECK", {
+      blocked: isBlocked,
+      title,
     });
 
-    if (btnCount === 0 && altBtnCount === 0) {
-      console.log("❌ DIAGNOSIS: PAGE_NOT_READY_OR_BLOCKED");
+    if (isBlocked) {
+      console.log("❌ DIAGNOSIS: BLOCKED_BY_CLOUDFLARE");
+      await browser.close();
+      return;
     }
 
     // =========================
-    // 3️⃣ CLICK ATTEMPT
+    // STEP 4 - BUTTON DETECTION
     // =========================
-    let clicked = false;
-
-    const targets = [
+    const btnSelectors = [
       page.getByText("签到"),
       page.getByText("立即签到"),
+      page.getByText("Check"),
       page.locator("button"),
+      page.locator("a"),
     ];
 
-    for (const t of targets) {
+    let clicked = false;
+
+    for (const btn of btnSelectors) {
       try {
-        if (await t.count() > 0) {
-          await t.first().click({ timeout: 3000 });
+        const count = await btn.count();
+        if (count > 0) {
+          await btn.first().click({ timeout: 3000 });
           clicked = true;
           break;
         }
       } catch {}
     }
 
-    logStep("STEP3_CLICK", { clicked });
+    logStep("STEP4_BUTTON_DETECTION", {
+      clicked,
+    });
 
     await page.waitForTimeout(5000);
 
-    await page.screenshot({ path: "step3_after_click.png", fullPage: true });
+    await page.screenshot({
+      path: "step4_after_click.png",
+      fullPage: true,
+    });
 
     // =========================
-    // 4️⃣ RESULT CHECK
+    // STEP 5 - RESULT ANALYSIS
     // =========================
     const content = await page.content();
 
     const success = content.includes("恭喜你签到成功");
     const already = content.includes("今日已签到");
 
-    logStep("STEP4_RESULT_FLAGS", {
+    logStep("STEP5_RESULT_FLAGS", {
       success,
       already,
     });
 
     // =========================
-    // 5️⃣ FINAL DIAGNOSIS
+    // FINAL DIAGNOSIS (UNCHANGED STYLE)
     // =========================
     if (success) {
       console.log("\n🎉 REAL_SUCCESS");
     } else if (already) {
       console.log("\n🟡 ALREADY_DONE");
+    } else if (isBlocked) {
+      console.log("\n❌ DIAGNOSIS: BLOCKED_BY_CLOUDFLARE");
     } else if (!clicked) {
       console.log("\n❌ DIAGNOSIS: BUTTON_NOT_CLICKED");
     } else {

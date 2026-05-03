@@ -22,7 +22,7 @@ const { chromium } = require('playwright');
   const page = await context.newPage();
 
   // 1️⃣ 打开首页
-  await page.goto('https://www.1point3acres.com', { waitUntil: 'networkidle' });
+  await page.goto('https://www.1point3acres.com', { waitUntil: 'domcontentloaded' });
 
   // 2️⃣ 点击“签到”
   await page.click('text=签到');

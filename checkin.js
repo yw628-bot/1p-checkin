@@ -29,7 +29,7 @@ const { chromium } = require('playwright');
 
   try {
     // =========================
-    // 2️⃣ 进入最稳入口（不是 task）
+    // 2️⃣ 进入最稳定入口
     // =========================
     await page.goto(
       'https://www.1point3acres.com/bbs/home.php?mod=space',
@@ -37,41 +37,37 @@ const { chromium } = require('playwright');
     );
 
     await page.waitForTimeout(5000);
-    await page.screenshot({ path: 'step1-home.png', fullPage: true });
+
+    await page.screenshot({ path: 'step1.png', fullPage: true });
 
     // =========================
-    // 3️⃣ 找“签到入口”（宽松匹配）
+    // 3️⃣ 尝试点击签到入口（如果存在）
     // =========================
-    const entryCandidates = page.locator('a, button, div').filter({
+    const entry = page.locator('a, button, div').filter({
       hasText: /签到|打卡|每日|check/i
     });
 
-    const entryCount = await entryCandidates.count();
-
-    if (entryCount > 0) {
-      await entryCandidates.first().click();
-    } else {
-      console.log('NO_ENTRY_FOUND');
+    if (await entry.count() > 0) {
+      await entry.first().click();
+      await page.waitForTimeout(3000);
     }
 
-    await page.waitForTimeout(4000);
-    await page.screenshot({ path: 'step2-entry.png', fullPage: true });
+    await page.screenshot({ path: 'step2.png', fullPage: true });
 
     // =========================
-    // 4️⃣ 点击“没心情”（如果存在）
+    // 4️⃣ 没心情（可选）
     // =========================
     const mood = page.locator('a, button, div, label').filter({
-      hasText: /没心情|neutral|不想/i
+      hasText: /没心情/i
     });
 
     if (await mood.count() > 0) {
       await mood.first().click();
+      await page.waitForTimeout(2000);
     }
 
-    await page.waitForTimeout(2000);
-
     // =========================
-    // 5️⃣ 点击“提交签到”
+    // 5️⃣ 提交签到（可选）
     // =========================
     const submit = page.locator('a, button, input').filter({
       hasText: /提交|签到|确认|submit/i
@@ -79,25 +75,27 @@ const { chromium } = require('playwright');
 
     if (await submit.count() > 0) {
       await submit.first().click();
+      await page.waitForTimeout(3000);
     }
 
-    await page.waitForTimeout(3000);
-    await page.screenshot({ path: 'step3-submit.png', fullPage: true });
+    await page.screenshot({ path: 'step3.png', fullPage: true });
 
     // =========================
-    // 6️⃣ 最终验证
+    // 6️⃣ 🔥 真实验证（核心修复）
     // =========================
-    const content = await page.content();
 
-    if (
-      content.includes('已签到') ||
-      content.includes('签到成功') ||
-      content.includes('今日已完成') ||
-      content.includes('success')
-    ) {
-      console.log('CONFIRMED_SUCCESS');
+    const signBtnCount = await page
+      .locator('text=签到')
+      .count();
+
+    const alreadyDoneText = await page
+      .locator('text=已签到, text=签到成功, text=今日已完成')
+      .count();
+
+    if (alreadyDoneText > 0 || signBtnCount === 0) {
+      console.log('REAL_SUCCESS');
     } else {
-      console.log('UNCERTAIN_OR_ALREADY_DONE');
+      console.log('FAILED_OR_NOT_DONE');
     }
 
   } catch (err) {

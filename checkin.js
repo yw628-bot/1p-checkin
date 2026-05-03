@@ -3,19 +3,14 @@ const { chromium } = require('playwright');
 function normalizeCookies(cookieInput) {
   try {
     const parsed = JSON.parse(cookieInput);
-
     if (Array.isArray(parsed)) {
       return parsed.map(c => ({
         name: c.name,
         value: c.value,
-        domain: c.domain || ".1point3acres.com",
+        domain: ".1point3acres.com",
         path: "/",
-        httpOnly: false,
-        secure: false,
-        sameSite: "Lax",
       }));
     }
-
     return [];
   } catch (e) {
     return [];
@@ -23,73 +18,56 @@ function normalizeCookies(cookieInput) {
 }
 
 (async () => {
-  const browser = await chromium.launch({
-    headless: true,
-  });
+  const browser = await chromium.launch({ headless: true });
 
   const context = await browser.newContext({
     userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36",
   });
 
-  // =========================
-  // 1️⃣ 注入真实 cookie（浏览器态）
-  // =========================
-  const cookies = normalizeCookies(process.env.COOKIES || "");
-  await context.addCookies(cookies);
+  await context.addCookies(normalizeCookies(process.env.COOKIES || ""));
 
   const page = await context.newPage();
 
   try {
     // =========================
-    // 2️⃣ 先进入页面（建立真实 session）
+    // 1️⃣ 打开签到页面
     // =========================
     await page.goto(
       "https://www.1point3acres.com/next/daily-checkin",
       { waitUntil: "domcontentloaded" }
     );
 
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
 
     // =========================
-    // 3️⃣ 在“浏览器环境”里调用 API（关键）
+    // 2️⃣ 点击签到按钮（关键修复点）
     // =========================
-    const result = await page.evaluate(async () => {
-      const res = await fetch(
-        "https://api.1point3acres.com/api/users/checkin",
-        {
-          method: "POST",
-          credentials: "include", // 🔥 关键：带上浏览器 session
-          headers: {
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({}),
-        }
-      );
+    const btn = page.locator('text=签到, text=立即签到, text=Sign');
 
-      return await res.text();
-    });
-
-    console.log("RAW_RESPONSE:", result);
+    if (await btn.count() > 0) {
+      await btn.first().click();
+      await page.waitForTimeout(3000);
+    }
 
     // =========================
-    // 4️⃣ 最终判断
+    // 3️⃣ 判断结果（唯一可靠方式）
     // =========================
-    if (result.includes("恭喜你签到成功")) {
+    const content = await page.content();
+
+    if (content.includes("恭喜你签到成功")) {
       console.log("REAL_SUCCESS");
-    } else if (result.includes("今日已签到")) {
+    } else if (content.includes("今日已签到")) {
       console.log("ALREADY_DONE");
-    } else if (result.includes("人机验证")) {
-      console.log("NEED_VERIFICATION");
     } else {
       console.log("FAILED");
     }
 
-    await page.screenshot({ path: "debug.png", fullPage: true });
+    await page.screenshot({ path: "result.png", fullPage: true });
 
   } catch (err) {
     console.log("ERROR:", err.message);
-    await page.screenshot({ path: "error.png", fullPage: true });
+    await page.screenshot({ path: "error.png" });
   }
 
   await browser.close();

@@ -1,5 +1,3 @@
-const fetch = require('node-fetch');
-
 (async () => {
   try {
     const res = await fetch(
@@ -19,18 +17,12 @@ const fetch = require('node-fetch');
 
     console.log("RESPONSE:", text);
 
-    // =========================
-    // 🎯 最终判定逻辑（定稿）
-    // =========================
-
     if (text.includes("恭喜你签到成功")) {
-      console.log("REAL_SUCCESS");   // 本次成功签到
-
+      console.log("REAL_SUCCESS");
     } else if (text.includes("今日已签到")) {
-      console.log("ALREADY_DONE");   // 今天已经签过（正常状态）
-
+      console.log("ALREADY_DONE");
     } else {
-      console.log("FAILED");        // 异常情况
+      console.log("FAILED");
     }
 
   } catch (err) {

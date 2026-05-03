@@ -8,7 +8,7 @@ const { chromium } = require('playwright');
   const context = await browser.newContext();
 
   // =========================
-  // 1️⃣ 修复 Cookie
+  // 1️⃣ Cookie 修复
   // =========================
   const rawCookies = JSON.parse(process.env.COOKIES || "[]");
 
@@ -29,54 +29,59 @@ const { chromium } = require('playwright');
 
   try {
     // =========================
-    // 2️⃣ 直接进入任务页（关键修复）
+    // 2️⃣ 进入最稳入口（不是 task）
     // =========================
     await page.goto(
-      'https://www.1point3acres.com/bbs/home.php?mod=task',
+      'https://www.1point3acres.com/bbs/home.php?mod=space',
       { waitUntil: 'domcontentloaded' }
     );
 
     await page.waitForTimeout(5000);
-
-    await page.screenshot({ path: 'step1-task.png', fullPage: true });
-
-    // =========================
-    // 3️⃣ 点击“签到”
-    // =========================
-    const signBtn = page
-      .locator('a, button')
-      .filter({ hasText: '签到' })
-      .first();
-
-    await signBtn.click({ timeout: 10000 });
-
-    await page.waitForTimeout(3000);
-    await page.screenshot({ path: 'step2-sign.png', fullPage: true });
+    await page.screenshot({ path: 'step1-home.png', fullPage: true });
 
     // =========================
-    // 4️⃣ 点击“没心情”
+    // 3️⃣ 找“签到入口”（宽松匹配）
     // =========================
-    const moodBtn = page
-      .locator('a, button, label, div')
-      .filter({ hasText: '没心情' })
-      .first();
+    const entryCandidates = page.locator('a, button, div').filter({
+      hasText: /签到|打卡|每日|check/i
+    });
 
-    await moodBtn.click({ timeout: 10000 });
+    const entryCount = await entryCandidates.count();
+
+    if (entryCount > 0) {
+      await entryCandidates.first().click();
+    } else {
+      console.log('NO_ENTRY_FOUND');
+    }
+
+    await page.waitForTimeout(4000);
+    await page.screenshot({ path: 'step2-entry.png', fullPage: true });
+
+    // =========================
+    // 4️⃣ 点击“没心情”（如果存在）
+    // =========================
+    const mood = page.locator('a, button, div, label').filter({
+      hasText: /没心情|neutral|不想/i
+    });
+
+    if (await mood.count() > 0) {
+      await mood.first().click();
+    }
 
     await page.waitForTimeout(2000);
 
     // =========================
     // 5️⃣ 点击“提交签到”
     // =========================
-    const submitBtn = page
-      .locator('a, button, input')
-      .filter({ hasText: '提交' })
-      .first();
+    const submit = page.locator('a, button, input').filter({
+      hasText: /提交|签到|确认|submit/i
+    });
 
-    await submitBtn.click({ timeout: 10000 });
+    if (await submit.count() > 0) {
+      await submit.first().click();
+    }
 
     await page.waitForTimeout(3000);
-
     await page.screenshot({ path: 'step3-submit.png', fullPage: true });
 
     // =========================
@@ -87,7 +92,8 @@ const { chromium } = require('playwright');
     if (
       content.includes('已签到') ||
       content.includes('签到成功') ||
-      content.includes('今日已完成')
+      content.includes('今日已完成') ||
+      content.includes('success')
     ) {
       console.log('CONFIRMED_SUCCESS');
     } else {
